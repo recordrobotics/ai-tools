@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Callable
 
 from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QPixmap, QPen, QColor, QPainter
+from PySide6.QtGui import QPixmap, QPen, QColor, QPainter, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -56,7 +56,11 @@ class ImageViewer(QWidget):
         self.scene = QGraphicsScene()
         self.view = QGraphicsView(self.scene)
         # enable antialiasing and smooth pixmap transform for nicer rendering
-        self.view.setRenderHints(self.view.renderHints() | QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        self.view.setRenderHints(
+            self.view.renderHints()
+            | QPainter.Antialiasing
+            | QPainter.SmoothPixmapTransform
+        )
         # always show the whole image (no scrollbars) and allow fitting on resize
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -103,6 +107,17 @@ class ImageViewer(QWidget):
         left_layout.addWidget(nav_prev)
         left_layout.addWidget(nav_next)
 
+        # Keyboard shortcuts: Enter/Return trigger Next image
+        try:
+            self._shortcut_next_return = QShortcut(QKeySequence(Qt.Key_Return), self)
+            self._shortcut_next_return.setAutoRepeat(False)
+            self._shortcut_next_return.activated.connect(self.next_image)
+            self._shortcut_next_enter = QShortcut(QKeySequence(Qt.Key_Enter), self)
+            self._shortcut_next_enter.setAutoRepeat(False)
+            self._shortcut_next_enter.activated.connect(self.next_image)
+        except Exception:
+            pass
+
         container = QHBoxLayout(self)
         sidebar = QWidget()
         sidebar.setLayout(left_layout)
@@ -137,8 +152,14 @@ class ImageViewer(QWidget):
             pen = QPen(self._qcolor_for_index(a.class_id), 2)
             grect = self.scene.addRect(rect, pen)
             self.box_items.append(BoxItem(grect, a))
-            label = self.labels[a.class_id].name if 0 <= a.class_id < len(self.labels) else str(a.class_id)
-            self.list_widget.addItem(f"{a.class_id}:{label} {a.x_center:.3f},{a.y_center:.3f} {a.width:.3f}x{a.height:.3f}")
+            label = (
+                self.labels[a.class_id].name
+                if 0 <= a.class_id < len(self.labels)
+                else str(a.class_id)
+            )
+            self.list_widget.addItem(
+                f"{a.class_id}:{label} {a.x_center:.3f},{a.y_center:.3f} {a.width:.3f}x{a.height:.3f}"
+            )
 
     def _yolo_to_rect(self, a: Annotation, w: int, h: int):
         x_center = a.x_center * w
@@ -184,7 +205,10 @@ class ImageViewer(QWidget):
         from PySide6.QtCore import QEvent
 
         if source is self.view.viewport():
-            if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            if (
+                event.type() == QEvent.MouseButtonPress
+                and event.button() == Qt.LeftButton
+            ):
                 pos = self.view.mapToScene(event.pos())
                 # clamp start to image bounds so drawing cannot begin outside
                 if getattr(self, "pix_item", None) is not None:
@@ -199,7 +223,11 @@ class ImageViewer(QWidget):
                 pen = QPen(self._qcolor_for_index(self.current_class_index), 2)
                 self._current_rect = self.scene.addRect(QRectF(pos, pos), pen)
                 return True
-            if event.type() == QEvent.MouseMove and self._dragging and self._current_rect:
+            if (
+                event.type() == QEvent.MouseMove
+                and self._dragging
+                and self._current_rect
+            ):
                 pos = self.view.mapToScene(event.pos())
                 # clamp position to image bounds so rectangle cannot grow beyond edges
                 if getattr(self, "pix_item", None) is not None:
@@ -213,7 +241,11 @@ class ImageViewer(QWidget):
                 r = r.intersected(self.scene.sceneRect())
                 self._current_rect.setRect(r)
                 return True
-            if event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton and self._dragging:
+            if (
+                event.type() == QEvent.MouseButtonRelease
+                and event.button() == Qt.LeftButton
+                and self._dragging
+            ):
                 self._dragging = False
                 if not self._current_rect:
                     return True
@@ -227,10 +259,18 @@ class ImageViewer(QWidget):
                 pen = QPen(self._qcolor_for_index(ann.class_id), 2)
                 self._current_rect.setPen(pen)
                 self.box_items.append(BoxItem(self._current_rect, ann))
-                lbl = self.labels[ann.class_id].name if 0 <= ann.class_id < len(self.labels) else str(ann.class_id)
-                self.list_widget.addItem(f"{ann.class_id}:{lbl} {ann.x_center:.3f},{ann.y_center:.3f} {ann.width:.3f}x{ann.height:.3f}")
+                lbl = (
+                    self.labels[ann.class_id].name
+                    if 0 <= ann.class_id < len(self.labels)
+                    else str(ann.class_id)
+                )
+                self.list_widget.addItem(
+                    f"{ann.class_id}:{lbl} {ann.x_center:.3f},{ann.y_center:.3f} {ann.width:.3f}x{ann.height:.3f}"
+                )
                 # persist
-                save_annotations(self.image_paths[self.index], [b.annotation for b in self.box_items])
+                save_annotations(
+                    self.image_paths[self.index], [b.annotation for b in self.box_items]
+                )
                 self._current_rect = None
                 self.on_update(self.image_paths[self.index])
                 return True
@@ -243,7 +283,9 @@ class ImageViewer(QWidget):
         item = self.box_items.pop(row)
         self.scene.removeItem(item.rect_item)
         self.list_widget.takeItem(row)
-        save_annotations(self.image_paths[self.index], [b.annotation for b in self.box_items])
+        save_annotations(
+            self.image_paths[self.index], [b.annotation for b in self.box_items]
+        )
         self.on_update(self.image_paths[self.index])
 
     def edit_selected_class(self) -> None:
@@ -253,14 +295,29 @@ class ImageViewer(QWidget):
         # pick from existing labels
         items = [f"{i}:{lbl.name}" for i, lbl in enumerate(self.labels)]
         current_id = self.box_items[row].annotation.class_id
-        cur_label = f"{current_id}:{self.labels[current_id].name}" if 0 <= current_id < len(self.labels) else str(current_id)
-        item, ok = QInputDialog.getItem(self, "Select class", "Class:", items, current=items.index(cur_label) if cur_label in items else 0, editable=False)
+        cur_label = (
+            f"{current_id}:{self.labels[current_id].name}"
+            if 0 <= current_id < len(self.labels)
+            else str(current_id)
+        )
+        item, ok = QInputDialog.getItem(
+            self,
+            "Select class",
+            "Class:",
+            items,
+            current=items.index(cur_label) if cur_label in items else 0,
+            editable=False,
+        )
         if ok and item:
             new_id = int(item.split(":", 1)[0])
             self.box_items[row].annotation.class_id = new_id
             lbl = self.labels[new_id] if 0 <= new_id < len(self.labels) else str(new_id)
-            self.list_widget.item(row).setText(f"{new_id}:{lbl} {self.box_items[row].annotation.x_center:.3f},{self.box_items[row].annotation.y_center:.3f} {self.box_items[row].annotation.width:.3f}x{self.box_items[row].annotation.height:.3f}")
-            save_annotations(self.image_paths[self.index], [b.annotation for b in self.box_items])
+            self.list_widget.item(row).setText(
+                f"{new_id}:{lbl} {self.box_items[row].annotation.x_center:.3f},{self.box_items[row].annotation.y_center:.3f} {self.box_items[row].annotation.width:.3f}x{self.box_items[row].annotation.height:.3f}"
+            )
+            save_annotations(
+                self.image_paths[self.index], [b.annotation for b in self.box_items]
+            )
             self.on_update(self.image_paths[self.index])
 
     def _refresh_labels_widget(self) -> None:
@@ -275,7 +332,9 @@ class ImageViewer(QWidget):
             h = QHBoxLayout(w)
             sw = QLabel()
             sw.setFixedSize(16, 16)
-            color = lbl.color if getattr(lbl, "color", None) else color_for_index(i).name()
+            color = (
+                lbl.color if getattr(lbl, "color", None) else color_for_index(i).name()
+            )
             sw.setStyleSheet(f"background-color: {color}; border: 1px solid #333;")
             text = QLabel(lbl.name)
             h.setContentsMargins(4, 2, 4, 2)
@@ -310,7 +369,11 @@ class ImageViewer(QWidget):
         if row < 0:
             return
         cur = self.labels[row]
-        initial = QColor(cur.color) if getattr(cur, "color", None) else self._qcolor_for_index(row)
+        initial = (
+            QColor(cur.color)
+            if getattr(cur, "color", None)
+            else self._qcolor_for_index(row)
+        )
         col = QColorDialog.getColor(initial, self, f"Choose color for {cur.name}")
         if col.isValid():
             hexcol = col.name()
@@ -339,7 +402,9 @@ class ImageViewer(QWidget):
         if row < 0:
             return
         cur = self.labels[row]
-        text, ok = QInputDialog.getText(self, "Rename class", "New name:", text=cur.name)
+        text, ok = QInputDialog.getText(
+            self, "Rename class", "New name:", text=cur.name
+        )
         if ok and text:
             self.labels[row].name = text
             self._refresh_labels_widget()
