@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QFrame,
 )
 
-# thumbnail generation handled by Qt/QPixmap; Pillow helper not required here
+# thumbnail generation handled by Qt/QPixmap; Pillow helper not required her
 
 
 class ImageCard(QFrame):
@@ -44,14 +44,21 @@ class ImageCard(QFrame):
             # fallback to small blank pixmap
             qpix = QPixmap(self.thumb.size())
             qpix.fill(Qt.transparent)
-        self.thumb.setPixmap(qpix.scaled(self.thumb.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.thumb.setPixmap(
+            qpix.scaled(self.thumb.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        )
 
     def _open(self) -> None:
         self.on_open(self.path)
 
 
 class GridView(QWidget):
-    def __init__(self, image_paths: List[Path], annotated_set: set, on_open: Callable[[Path], None]):
+    def __init__(
+        self,
+        image_paths: List[Path],
+        annotated_set: set,
+        on_open: Callable[[Path], None],
+    ):
         super().__init__()
         layout = QVBoxLayout(self)
         scroll = QScrollArea()

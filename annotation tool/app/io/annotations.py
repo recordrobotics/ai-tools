@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 
 @dataclass
@@ -44,5 +44,7 @@ def save_annotations(image_path: Path, anns: List[Annotation]) -> None:
     txt = annotation_txt_path(image_path)
     lines: List[str] = []
     for a in anns:
-        lines.append(f"{a.class_id} {a.x_center:.6f} {a.y_center:.6f} {a.width:.6f} {a.height:.6f}")
+        lines.append(
+            f"{a.class_id} {a.x_center:.6f} {a.y_center:.6f} {a.width:.6f} {a.height:.6f}"
+        )
     txt.write_text("\n".join(lines), encoding="utf-8")

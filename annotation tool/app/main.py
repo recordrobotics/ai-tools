@@ -23,7 +23,7 @@ from app.ui.image_viewer import ImageViewer
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Minimal Annotation Tool")
+        self.setWindowTitle("Image Annotation Tool")
         self.resize(1000, 700)
         layout = QVBoxLayout(self)
 
@@ -86,7 +86,11 @@ class MainWindow(QWidget):
         self._viewers.append(viewer)
         # remove from list when destroyed to avoid memory leak
         try:
-            viewer.destroyed.connect(lambda _, v=viewer: self._viewers.remove(v) if v in self._viewers else None)
+            viewer.destroyed.connect(
+                lambda _, v=viewer: (
+                    self._viewers.remove(v) if v in self._viewers else None
+                )
+            )
         except Exception:
             pass
         viewer.show()
