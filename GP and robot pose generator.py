@@ -1,4 +1,4 @@
-import math, random
+import math, random, timeit
 import matplotlib.pyplot as plt  # type: ignore
 
 FIELD_OCTOGON = [
@@ -155,6 +155,7 @@ def random_convex_in_field(convex, other_convexes=[]):
         if check_convex_not_intersecting(convex, pose, other_convexes):
             return pose
 
+
 def fill_field_with_objects():
     robot_pose = random_convex_in_field(ROBOT_SQUARE)
     robot_polygon = move_polygon_to_pose(ROBOT_SQUARE, robot_pose)
@@ -175,9 +176,11 @@ def fill_field_with_objects():
 
     return robot_polygon, coral_polygons, algae_polygons
 
-robot_polygon, coral_polygons, algae_polygons = fill_field_with_objects()
-draw_polygons(
-    [FIELD_OCTOGON, FIELD_CENTER_SQUARE, FIELD_BLUE_REEF, FIELD_RED_REEF, robot_polygon]
-    + coral_polygons
-    + algae_polygons
+
+timeit_start = timeit.default_timer()
+for _ in range(1000):
+    robot_polygon, coral_polygons, algae_polygons = fill_field_with_objects()
+timeit_end = timeit.default_timer()
+print(
+    f"Generated field with robot and objects 1000 times in {timeit_end - timeit_start} seconds."
 )
