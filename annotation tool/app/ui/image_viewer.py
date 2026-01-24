@@ -130,6 +130,10 @@ class ImageViewer(QWidget):
             self._shortcut_next_enter = QShortcut(QKeySequence(Qt.Key_Enter), self)
             self._shortcut_next_enter.setAutoRepeat(False)
             self._shortcut_next_enter.activated.connect(self.next_image)
+            # Also allow Space to trigger Next image
+            self._shortcut_next_space = QShortcut(QKeySequence(Qt.Key_Space), self)
+            self._shortcut_next_space.setAutoRepeat(False)
+            self._shortcut_next_space.activated.connect(self.next_image)
         except Exception:
             pass
 
