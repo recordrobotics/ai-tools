@@ -5,7 +5,15 @@ from pathlib import Path
 from typing import List, Callable
 
 from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QPixmap, QPen, QColor, QPainter, QKeySequence, QShortcut
+from PySide6.QtGui import (
+    QPixmap,
+    QPen,
+    QColor,
+    QPainter,
+    QKeySequence,
+    QShortcut,
+    QBrush,
+)
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -83,6 +91,13 @@ class ImageViewer(QWidget):
         edit_color_btn.clicked.connect(self.edit_label_color)
 
         self.list_widget = QListWidget()
+        # highlight selected annotation with semi-transparent fill
+        try:
+            self.list_widget.itemSelectionChanged.connect(
+                self._on_annotations_selection_changed
+            )
+        except Exception:
+            pass
 
         left_layout = QVBoxLayout()
         left_layout.addWidget(QLabel("Classes"))
@@ -160,6 +175,8 @@ class ImageViewer(QWidget):
             self.list_widget.addItem(
                 f"{a.class_id}:{label} {a.x_center:.3f},{a.y_center:.3f} {a.width:.3f}x{a.height:.3f}"
             )
+        # ensure no box is filled until a selection is made
+        self._update_selected_box_highlight(None)
 
     def _yolo_to_rect(self, a: Annotation, w: int, h: int):
         x_center = a.x_center * w
@@ -273,6 +290,8 @@ class ImageViewer(QWidget):
                 )
                 self._current_rect = None
                 self.on_update(self.image_paths[self.index])
+                # update fill state after potential selection change
+                self._update_selected_box_highlight(self.list_widget.currentRow())
                 return True
         return super().eventFilter(source, event)
 
@@ -287,6 +306,8 @@ class ImageViewer(QWidget):
             self.image_paths[self.index], [b.annotation for b in self.box_items]
         )
         self.on_update(self.image_paths[self.index])
+        # refresh fills for new selection state
+        self._update_selected_box_highlight(self.list_widget.currentRow())
 
     def edit_selected_class(self) -> None:
         row = self.list_widget.currentRow()
@@ -311,7 +332,15 @@ class ImageViewer(QWidget):
         if ok and item:
             new_id = int(item.split(":", 1)[0])
             self.box_items[row].annotation.class_id = new_id
-            lbl = self.labels[new_id] if 0 <= new_id < len(self.labels) else str(new_id)
+            # update outline color to reflect new class
+            self.box_items[row].rect_item.setPen(
+                QPen(self._qcolor_for_index(new_id), 2)
+            )
+            lbl = (
+                self.labels[new_id].name
+                if 0 <= new_id < len(self.labels)
+                else str(new_id)
+            )
             self.list_widget.item(row).setText(
                 f"{new_id}:{lbl} {self.box_items[row].annotation.x_center:.3f},{self.box_items[row].annotation.y_center:.3f} {self.box_items[row].annotation.width:.3f}x{self.box_items[row].annotation.height:.3f}"
             )
@@ -319,6 +348,8 @@ class ImageViewer(QWidget):
                 self.image_paths[self.index], [b.annotation for b in self.box_items]
             )
             self.on_update(self.image_paths[self.index])
+            # update fill to reflect possibly changed class color
+            self._update_selected_box_highlight(row)
 
     def _refresh_labels_widget(self) -> None:
         """Rebuild the labels widget with colored swatches. Preserves selection if possible."""
@@ -385,6 +416,14 @@ class ImageViewer(QWidget):
             self._refresh_labels_widget()
             if self.on_labels_changed:
                 self.on_labels_changed(self.labels)
+            # refresh list item texts to reflect new names
+            self._refresh_annotation_list_texts()
+            # refresh all box outlines to new colors
+            self._refresh_box_outline_colors()
+            # refresh list item texts (names) to reflect any label changes
+            self._refresh_annotation_list_texts()
+            # update fill for currently selected annotation (if any)
+            self._update_selected_box_highlight(self.list_widget.currentRow())
 
     # Label (class) management
     def add_label(self) -> None:
@@ -413,6 +452,8 @@ class ImageViewer(QWidget):
                 save_labels(self.folder, self.labels)
             if self.on_labels_changed:
                 self.on_labels_changed(self.labels)
+            # refresh annotation list texts to reflect renamed class
+            self._refresh_annotation_list_texts()
 
     def remove_label(self) -> None:
         row = self.labels_widget.currentRow()
@@ -440,3 +481,47 @@ class ImageViewer(QWidget):
         if self.index < len(self.image_paths) - 1:
             self.index += 1
             self._load_current_image()
+
+    # --- Annotation selection highlighting ---
+    def _on_annotations_selection_changed(self) -> None:
+        """Update box fill when the annotations list selection changes."""
+        self._update_selected_box_highlight(self.list_widget.currentRow())
+
+    def _update_selected_box_highlight(self, selected_row: int | None) -> None:
+        """Apply 50% opacity fill to the selected annotation's rectangle.
+
+        All other rectangles remain unfilled (outline only).
+        """
+        for i, box in enumerate(self.box_items):
+            if selected_row is not None and i == selected_row:
+                col = self._qcolor_for_index(box.annotation.class_id)
+                c = QColor(col)
+                try:
+                    c.setAlphaF(0.5)
+                except Exception:
+                    c.setAlpha(128)
+                box.rect_item.setBrush(QBrush(c))
+            else:
+                # clear fill using a fully transparent brush to avoid Qt.NoBrush lint issues
+                box.rect_item.setBrush(QBrush(QColor(0, 0, 0, 0)))
+
+    def _refresh_box_outline_colors(self) -> None:
+        """Update all box outline pens to match current label colors."""
+        for box in self.box_items:
+            pen = QPen(self._qcolor_for_index(box.annotation.class_id), 2)
+            box.rect_item.setPen(pen)
+
+    def _refresh_annotation_list_texts(self) -> None:
+        """Update all annotation list entries to show current label names."""
+        for i, box in enumerate(self.box_items):
+            a = box.annotation
+            label = (
+                self.labels[a.class_id].name
+                if 0 <= a.class_id < len(self.labels)
+                else str(a.class_id)
+            )
+            item = self.list_widget.item(i)
+            if item:
+                item.setText(
+                    f"{a.class_id}:{label} {a.x_center:.3f},{a.y_center:.3f} {a.width:.3f}x{a.height:.3f}"
+                )
