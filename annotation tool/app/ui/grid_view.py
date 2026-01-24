@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QFrame,
 )
 
-# thumbnail generation handled by Qt/QPixmap; Pillow helper not required her
+# thumbnail generation handled by Qt/QPixmap; Pillow helper not required here
 
 
 class ImageCard(QFrame):
